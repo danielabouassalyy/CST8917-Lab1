@@ -226,3 +226,33 @@ az functionapp config appsettings set \
 func azure functionapp publish lab1-queue-func
 ```
 
+## Test your SQL function end-to-end
+```bash
+
+# Grab the SQL function’s key
+sqlKey=$(az functionapp function keys list \
+  --resource-group lab1-rg \
+  --name lab1-queue-func \
+  --function-name HttpToSql \
+  --query default -o tsv)
+
+# Invoke it
+curl "https://lab1-queue-func.azurewebsites.net/api/sql?code=$sqlKey&msg=TestSQL"
+# Expect: Inserted: TestSQL
+
+# Confirm in the database (Portal Query Editor or):
+az sql db show-connection-string \
+  --client ado.net \
+  --name lab1db \
+  --server lab1sqlsrv
+# Then use your favorite SQL client to SELECT * FROM Messages;
+```
+## Commit and push your SQL function changes
+```bash
+cd queueApp
+git add HttpToSql/function.json HttpToSql/__init__.py
+git commit -m "✅ Azure SQL function deployed and verified"
+git push
+
+```
+
