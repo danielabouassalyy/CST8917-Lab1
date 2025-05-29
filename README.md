@@ -124,6 +124,105 @@ curl "https://lab1-queue-func.azurewebsites.net/api/HttpToQueue?code=$funcKey&ms
 # verify in your storage queue
 az storage queue peek --account-name lab1store12345 --name lab1-output-queue --num-messages 5
 ```
+## Scaffold the Azure SQL function
+```bash
+
+# From queueApp folder
+func new --name HttpToSql --template "HTTP trigger" --authlevel function
+```
+
+## Add the SQL output binding
+Edit HttpToSql/function.json and replace its "bindings" with:
+```bash
+
+{
+  "scriptFile": "__init__.py",
+  "bindings": [
+    {
+      "authLevel": "function",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "req",
+      "methods": ["get","post"],
+      "route": "sql"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "$return"
+    },
+    {
+      "name": "outputRecord",
+      "type": "sql",
+      "direction": "out",
+      "connectionStringSetting": "SqlConnectionString",
+      "tableName": "Messages"
+    }
+  ]
+}
+
+```
+## Implement the SQL function code
+Replace HttpToSql/__init__.py with:
+```bash
+
+import azure.functions as func
+
+def main(req: func.HttpRequest, outputRecord: func.Out[func.SqlRow]) -> func.HttpResponse:
+    text = req.params.get("msg") or (req.get_json(silent=True) or {}).get("msg") or "Hello SQL"
+    outputRecord.set(func.SqlRow({"Text": text}))
+    return func.HttpResponse(f"Inserted: {text}", status_code=200)
+
+```
+## Provision your Azure SQL server & database
+```bash
+# (No venv needed)
+az sql server create `
+  --name lab1sqlsrv `
+  --resource-group lab1-rg `
+  --location canadacentral `
+  --admin-user lab1admin `
+  --admin-password "P@ssw0rd123!"
+
+az sql db create `
+  --resource-group lab1-rg `
+  --server lab1sqlsrv `
+  --name lab1db `
+  --service-objective S0
 
 
+```
+## Open firewall & create the Messages table
+
+```bash
+az sql server firewall-rule create `
+  --resource-group lab1-rg `
+  --server lab1sqlsrv `
+  --name AllowMyIP `
+  --start-ip-address <your_ip> `
+  --end-ip-address <your_ip>
+# and/or:
+az sql server firewall-rule create -g lab1-rg -s lab1sqlsrv -n AllowAzureServices --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
+```
+
+## In the Azure Portal, go to lab1sqlsrv → Databases → lab1db → Query editor (preview), sign in, and run:
+```bash
+
+CREATE TABLE Messages (
+  Id    INT IDENTITY(1,1) PRIMARY KEY,
+  Text  NVARCHAR(200)
+);
+
+```
+## Wire up your Function App & deploy the SQL function
+```bash
+# Configure your Function App with the DB connection string
+az functionapp config appsettings set \
+  --name lab1-queue-func \
+  --resource-group lab1-rg \
+  --settings SqlConnectionString="Server=tcp:lab1sqlsrv.database.windows.net,1433;Database=lab1db;User ID=lab1admin;Password=P@ssw0rd123!;Encrypt=true"
+
+# Publish both functions (from queueApp with venv active)
+func azure functionapp publish lab1-queue-func
+```
 
