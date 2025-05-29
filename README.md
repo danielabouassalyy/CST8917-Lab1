@@ -1,3 +1,4 @@
+[Lab 1 Demo Video](https://youtu.be/1cbL3N006t8?si=BN40SQUYEXn3x-ul)
 ## Clone Your Repo & Create a Python venv
 
 ```bash
