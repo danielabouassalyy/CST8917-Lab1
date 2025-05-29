@@ -8,7 +8,6 @@ py -3.11 -m venv .venv
 ```
 
 ## Activate the venv:
-## PowerShell:
 ```bash
 . .\.venv\Scripts\Activate.ps1
 ```
